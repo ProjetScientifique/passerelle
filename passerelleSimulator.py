@@ -5,6 +5,8 @@
 
 import serial
 import json
+import paho.mqtt.client as mqtt
+import time
 
 '''
  * variables for script
@@ -12,10 +14,12 @@ import json
 
 FILENAME        = "values.txt"
 LAST_VALUE      = "deadbeef"
-SERIALPORT      = "/dev/tty.usbmodem14102"
+SERIALPORT      = "COM4"
 BAUDRATE        = 115200
 
 ser = serial.Serial()
+client = mqtt.Client("", True)
+queueMessage = []
 
 # -------------------- Functions -------------------- #
 '''
@@ -40,6 +44,41 @@ def initUART():
         exit()
 
 '''
+ * init mqtt
+'''
+def initMQTT():
+    client.connect("127.0.0.1", 1883, 60)
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.loop_start()
+
+'''
+ * function on connect for mqtt broker
+'''
+def on_connect(client, userdata, flags, rc):
+  print("Connected with result code "+str(rc))
+  client.subscribe("topic/detectors")
+
+'''
+ * function on message for mqtt broker
+'''
+def on_message(client, userdata, msg): # MANQUE LA LOGIQUE DE VERIF DES MESSAGES POUR RENVOYER ET TOUT
+    #queueMessage.append(msg.payload)
+    print(msg.payload)
+    sendUARTMessage(msg.payload)
+    '''
+    for i in range (5):
+        msgRcvd = readUARTMessage()
+        if (msgRcvd == "MESSAGE_SUCCESS"):
+            queueMessage.pop(0)
+            return 1
+        else:
+            time.sleep(0.5)
+    print("TIMEOUT for msg : <{queueMessage[0]}>")
+    queueMessage.pop(0)
+    '''
+
+'''
  * send message to microcontroller with serial
 '''
 def sendUARTMessage(msg):
@@ -47,54 +86,30 @@ def sendUARTMessage(msg):
     print(f"Message <{msg.decode()}> sent to micro-controller")
 
 '''
-* get values of triggered detectors from db
+ * receive message from serial
 '''
-def getTriggeredDetectors():
-    return json.dumps(
-        {
-            "Detectors": [
-                {
-                    "latitude_capteur": 0,
-                    "longitude_capteur": 0,
-                    "nom_capteur": None,
-                    "id_capteur":0
-                },
-                {
-                    "latitude_capteur": 0,
-                    "longitude_capteur": 0,
-                    "nom_capteur": None,
-                    "id_capteur":1
-                },
-                {
-                    "latitude_capteur": 0,
-                    "longitude_capteur": 0,
-                    "nom_capteur": None,
-                    "id_capteur":2
-                },
-                {
-                    "latitude_capteur": 0,
-                    "longitude_capteur": 0,
-                    "nom_capteur": None,
-                    "id_capteur":3
-                }
-            ]
-    })
+def readUARTMessage():
+    msg = ser.readline()
+    ser.flush()
+    packet = msg.decode()
+    return packet
 
 '''
  * main program logic follows:
 '''
 if __name__ == '__main__':
-    #initUART()
+    initUART()
+    initMQTT()
 
     print ('Press Ctrl-C to quit.')
 
     try:
         print(f"Server started")
-        # TODO
-        print(getTriggeredDetectors())
+        
+        while ser.isOpen() : 
+            if (ser.inWaiting() > 0): # if incoming bytes are waiting
+                print(readUARTMessage())
     except (KeyboardInterrupt, SystemExit):
-        server.shutdown()
-        server.server_close()
-        # f.close()
+        client.disconnect()
         ser.close()
         exit()
