@@ -14,12 +14,14 @@ import time
 
 FILENAME        = "values.txt"
 LAST_VALUE      = "deadbeef"
-SERIALPORT      = "COM4"
+SERIALPORT      = "COM3"
 BAUDRATE        = 115200
 
 ser = serial.Serial()
 client = mqtt.Client("", True)
 queueMessage = []
+idMsg = 0
+idFire = 0
 
 # -------------------- Functions -------------------- #
 '''
@@ -62,35 +64,39 @@ def on_connect(client, userdata, flags, rc):
 '''
  * function on message for mqtt broker
 '''
-def on_message(client, userdata, msg): # MANQUE LA LOGIQUE DE VERIF DES MESSAGES POUR RENVOYER ET TOUT
-    #queueMessage.append(msg.payload)
-    print(msg.payload)
-    sendUARTMessage(msg.payload)
-    '''
-    for i in range (5):
-        msgRcvd = readUARTMessage()
-        if (msgRcvd == "MESSAGE_SUCCESS"):
-            queueMessage.pop(0)
-            return 1
-        else:
-            time.sleep(0.5)
-    print("TIMEOUT for msg : <{queueMessage[0]}>")
-    queueMessage.pop(0)
-    '''
+def on_message(client, userdata, msg): # MANQUE LA LOGIQUE DE VERIF DES MESSAGES POUR RENVOYER ET TOUT 
+    global idFire
+    arr = formatData(msg.payload.decode().split("\n")[:-1])
+    for msgToSend in arr :
+        queueMessage.append(msgToSend)
+        sendUARTMessage(msgToSend)
+    idFire += 1
 
+'''
+ * adds idFire key to json objects
+'''
+def formatData(arr):
+    global idMsg
+    for i in range (len(arr)) :
+        jsonElem = json.loads(arr[i])
+        jsonElem["idMsg"] = idMsg
+        jsonElem["idFire"] = idFire
+        arr[i] = json.dumps(jsonElem)
+        idMsg += 1
+    return arr
 '''
  * send message to microcontroller with serial
 '''
 def sendUARTMessage(msg):
-    ser.write(msg)
-    print(f"Message <{msg.decode()}> sent to micro-controller")
+    ser.write(msg.encode())
+    print(f"Message <{msg}> sent to micro-controller")
+    time.sleep(0.5)
 
 '''
  * receive message from serial
 '''
 def readUARTMessage():
     msg = ser.readline()
-    ser.flush()
     packet = msg.decode()
     return packet
 
@@ -101,15 +107,25 @@ if __name__ == '__main__':
     initUART()
     initMQTT()
 
-    print ('Press Ctrl-C to quit.')
-
+    print ('Press Ctrl-C to quit.') 
     try:
         print(f"Server started")
-        
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                print(readUARTMessage())
+                print("damn : " + readUARTMessage())
+                '''
+                msgReceived = readUARTMessage()
+                if msgReceived == "NACK" :
+                    sendUARTMessage(queueMessage[0])
+                elif msgReceived == "ACK" :
+                    queueMessage.pop(0)
+                elif msgReceived != None :
+                    print(msgReceived)
+                '''
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
         exit()
+
+
+# En gros le microbit reçoit un par un, maintenant faut qu'il choppe l'id du msg dnas le contenu, et qu'il l'utilise pr envoyer son ACK ou NACK en gros comme ça la saloppe de paserelle fait des trucs
