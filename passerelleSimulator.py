@@ -12,9 +12,7 @@ import time
  * variables for script
 '''
 
-FILENAME        = "values.txt"
-LAST_VALUE      = "deadbeef"
-SERIALPORT      = "COM3"
+SERIALPORT      = "/dev/ttyACM0"
 BAUDRATE        = 115200
 
 ser = serial.Serial()
@@ -64,7 +62,7 @@ def on_connect(client, userdata, flags, rc):
 '''
  * function on message for mqtt broker
 '''
-def on_message(client, userdata, msg): # MANQUE LA LOGIQUE DE VERIF DES MESSAGES POUR RENVOYER ET TOUT 
+def on_message(client, userdata, msg):
     global idFire
     arr = formatData(msg.payload.decode().split("\n")[:-1])
     for msgToSend in arr :
@@ -112,20 +110,19 @@ if __name__ == '__main__':
         print(f"Server started")
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                print("damn : " + readUARTMessage())
-                '''
-                msgReceived = readUARTMessage()
-                if msgReceived == "NACK" :
-                    sendUARTMessage(queueMessage[0])
-                elif msgReceived == "ACK" :
-                    queueMessage.pop(0)
-                elif msgReceived != None :
-                    print(msgReceived)
-                '''
+                msgReceived = json.loads(readUARTMessage().replace("'", '"')) 
+
+                for elem in queueMessage :
+                    jsonElem = json.loads(elem)
+                    if str(jsonElem["idMsg"]) == msgReceived["id"] :
+                        if msgReceived["status"] == "ACK":
+                            queueMessage.remove(elem)
+                        elif msgReceived["status"] == "NACK":
+                            sendUARTMessage(elem)
+                        else:
+                            print(msgReceived)
+                
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
         exit()
-
-
-# En gros le microbit reçoit un par un, maintenant faut qu'il choppe l'id du msg dnas le contenu, et qu'il l'utilise pr envoyer son ACK ou NACK en gros comme ça la saloppe de paserelle fait des trucs
