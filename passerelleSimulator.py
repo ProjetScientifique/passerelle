@@ -8,6 +8,7 @@ import serial
 import json
 import paho.mqtt.client as mqtt
 import time
+import re
 
 '''
  * variables for script
@@ -84,7 +85,6 @@ def formatData(arr):
 def sendUARTMessage(msg):
     ser.write(msg.encode())
     print(f"Message <{msg}> sent to micro-controller")
-    time.sleep(0.5)
 
 '''
  * receive message from serial
@@ -108,26 +108,20 @@ if __name__ == '__main__':
             for msg in queueMessage :
                 sendUARTMessage(msg)
                 status = "NACK"
+                start = time.time()
                 while status == "NACK" :
-                    start = time.time()
                     if (time.time() - start) > 2 :
-                        sendUARTMessage()
+                        sendUARTMessage(msg)
                         start = time.time()
-                    if (ser.inWaiting() > 0): # if incoming bytes are waiting
+                    elif (ser.inWaiting() > 0): # if incoming bytes are waiting
                         data = readUARTMessage()
+                        print(data)
                         if data != None :
-                            try :
-                                jsonReceived = json.loads(data.replace("'",'"'))
-                                jsonMsgSent = json.loads(msg)
-                                print(jsonReceived)
-                                if str(jsonMsgSent["idMsg"]) == jsonReceived["id"] :
-                                    if jsonReceived['status'] == "ACK" :
-                                        queueMessage.remove(msg)
-                                        status = "ACK"
-                                    else :
-                                        sendUARTMessage(msg)
-                            except ValueError as e :
-                                sendUARTMessage(msg)
+                            if re.search("^ACK", data) :
+                                queueMessage.remove(msg)
+                                status = "ACK"
+                        else :
+                            sendUARTMessage(msg)
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
