@@ -68,10 +68,7 @@ if __name__ == '__main__':
         
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                while elem != "\n":
-                    elem = ser.read(1)
-                    msgReceived += elem
-                print(msgReceived)
+                print(readUARTMessage())
     except (KeyboardInterrupt, SystemExit):
         ser.close()
         exit()
