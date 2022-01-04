@@ -3,6 +3,7 @@
  * USB tty -> /dev/tty.usbmodem14102
 '''
 
+from os import read
 import serial
 import json
 import paho.mqtt.client as mqtt
@@ -18,7 +19,6 @@ BAUDRATE        = 115200
 ser = serial.Serial()
 client = mqtt.Client("", True)
 queueMessage = []
-idMsg = 0
 idFire = 0
 
 # -------------------- Functions -------------------- #
@@ -67,20 +67,16 @@ def on_message(client, userdata, msg):
     arr = formatData(msg.payload.decode().split("\n")[:-1])
     for msgToSend in arr :
         queueMessage.append(msgToSend)
-        sendUARTMessage(msgToSend + "\n")
     idFire += 1
 
 '''
  * adds idFire key to json objects
 '''
 def formatData(arr):
-    global idMsg
     for i in range (len(arr)) :
         jsonElem = json.loads(arr[i])
-        jsonElem["idMsg"] = idMsg
         jsonElem["idFire"] = idFire
         arr[i] = json.dumps(jsonElem)
-        idMsg += 1
     return arr
 '''
  * send message to microcontroller with serial
@@ -88,6 +84,7 @@ def formatData(arr):
 def sendUARTMessage(msg):
     ser.write(msg.encode())
     print(f"Message <{msg}> sent to micro-controller")
+    time.sleep(0.5)
 
 '''
  * receive message from serial
@@ -103,28 +100,34 @@ def readUARTMessage():
 if __name__ == '__main__':
     initUART()
     initMQTT()
-    elem = ""
-    msgReceived = ""
 
     print ('Press Ctrl-C to quit.') 
     try:
         print(f"Server started")
         while ser.isOpen() : 
-            if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                while elem != "\n":
-                    elem = ser.read(1)
-                    msgReceived += elem
-                msgReceived = msgReceived.replace("'", '"')) 
-                for elem in queueMessage :
-                    jsonElem = json.loads(elem)
-                    if str(jsonElem["idMsg"]) == msgReceived["id"] :
-                        if msgReceived["status"] == "ACK":
-                            queueMessage.remove(elem)
-                        elif msgReceived["status"] == "NACK":
-                            sendUARTMessage(elem)
-                        else:
-                            print(msgReceived)
-                
+            for msg in queueMessage :
+                sendUARTMessage(msg)
+                status = "NACK"
+                while status == "NACK" :
+                    start = time.time()
+                    if (time.time() - start) > 2 :
+                        sendUARTMessage()
+                        start = time.time()
+                    if (ser.inWaiting() > 0): # if incoming bytes are waiting
+                        data = readUARTMessage()
+                        if data != None :
+                            try :
+                                jsonReceived = json.loads(data.replace("'",'"'))
+                                jsonMsgSent = json.loads(msg)
+                                print(jsonReceived)
+                                if str(jsonMsgSent["idMsg"]) == jsonReceived["id"] :
+                                    if jsonReceived['status'] == "ACK" :
+                                        queueMessage.remove(msg)
+                                        status = "ACK"
+                                    else :
+                                        sendUARTMessage(msg)
+                            except ValueError as e :
+                                sendUARTMessage(msg)
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
