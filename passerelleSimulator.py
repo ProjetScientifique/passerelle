@@ -67,7 +67,7 @@ def on_message(client, userdata, msg):
     arr = formatData(msg.payload.decode().split("\n")[:-1])
     for msgToSend in arr :
         queueMessage.append(msgToSend)
-        sendUARTMessage(msgToSend)
+        sendUARTMessage(msgToSend + "\n")
     idFire += 1
 
 '''
@@ -88,7 +88,6 @@ def formatData(arr):
 def sendUARTMessage(msg):
     ser.write(msg.encode())
     print(f"Message <{msg}> sent to micro-controller")
-    time.sleep(0.5)
 
 '''
  * receive message from serial
@@ -104,14 +103,18 @@ def readUARTMessage():
 if __name__ == '__main__':
     initUART()
     initMQTT()
+    elem = ""
+    msgReceived = ""
 
     print ('Press Ctrl-C to quit.') 
     try:
         print(f"Server started")
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                msgReceived = json.loads(readUARTMessage().replace("'", '"')) 
-
+                while elem != "\n":
+                    elem = ser.read(1)
+                    msgReceived += elem
+                msgReceived = msgReceived.replace("'", '"')) 
                 for elem in queueMessage :
                     jsonElem = json.loads(elem)
                     if str(jsonElem["idMsg"]) == msgReceived["id"] :

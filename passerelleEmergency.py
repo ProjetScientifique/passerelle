@@ -44,7 +44,6 @@ def initUART():
 def sendUARTMessage(msg):
     ser.write(msg)
     print(f"Message <{msg.decode()}> sent to micro-controller")
-    time.sleep(0.5)
 
 '''
  * receive message from serial
@@ -59,6 +58,8 @@ def readUARTMessage():
 '''
 if __name__ == '__main__':
     initUART()
+    elem = ""
+    msgReceived = ""
 
     print ('Press Ctrl-C to quit.')
 
@@ -67,7 +68,10 @@ if __name__ == '__main__':
         
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                print(readUARTMessage())
+                while elem != "\n":
+                    elem = ser.read(1)
+                    msgReceived += elem
+                print(msgReceived)
     except (KeyboardInterrupt, SystemExit):
         ser.close()
         exit()
