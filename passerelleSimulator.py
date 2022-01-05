@@ -21,7 +21,6 @@ BAUDRATE        = 115200
 ser = serial.Serial()
 client = mqtt.Client("", True)
 queueMessage = []
-idFire = 0
 
 # -------------------- Functions -------------------- #
 '''
@@ -65,36 +64,43 @@ def on_connect(client, userdata, flags, rc):
  * function on message for mqtt broker
 '''
 def on_message(client, userdata, msg):
-    global idFire
     arr = formatData(msg.payload.decode().split("\n")[:-1])
     for msgToSend in arr :
         queueMessage.append(msgToSend)
-    idFire += 1
 
 '''
  * adds idFire key to json objects
 '''
 def formatData(arr):
     for i in range (len(arr)) :
-        jsonElem = json.loads(arr[i])
-        jsonElem["idFire"] = idFire
-        arr[i] = json.dumps(jsonElem)
+        arr[i] += "|||" + str(calculateChecksum(arr[i]))
     return arr
+
+'''
+ * calculate checksum for a given message
+'''
+def calculateChecksum(message):
+        nleft = len(message)
+        sum = 0
+        pos = 0
+        while nleft > 1:
+            sum = ord(message[pos]) * 256 + (ord(message[pos + 1]) + sum)
+            pos = pos + 2
+            nleft = nleft - 2
+        if nleft == 1:
+            sum = sum + ord(message[pos]) * 256
+
+        sum = (sum >> 16) + (sum & 0xFFFF)
+        sum += (sum >> 16)
+        sum = (~sum & 0xFFFF)
+
+        return sum
+
 '''
  * send message to microcontroller with serial
 '''
 def sendUARTMessage(msg):
-    ser.write(msg.encode())  ## Soit foutre un checksum du message et faire la verif au nivua du microbit, soit changer le baudrate en un truc plus bas
-    '''
-    verif = False
-    while verif == False:
-        if ser.inWaiting() > 0 :
-            if readUARTMessage() != msg :
-                ser.write(msg.encode())
-            else :
-                ser.write("ACK".encode())
-                verif = True
-    '''
+    ser.write(msg.encode())
     print(f"Message <{msg}> sent to micro-controller")
 
 '''
@@ -126,7 +132,7 @@ if __name__ == '__main__':
                         start = time.time()
                     elif (ser.inWaiting() > 0): # if incoming bytes are waiting
                         data = readUARTMessage()
-                        #print(data)
+                        print(data)
                         if data != None :
                             if re.search("^ACK", data) :
                                 queueMessage.remove(msg)
@@ -134,6 +140,7 @@ if __name__ == '__main__':
                                 status = "ACK"
                         else :
                             sendUARTMessage(msg)
+                            start = time.time()
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
