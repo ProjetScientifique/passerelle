@@ -75,20 +75,20 @@ def readUARTMessage():
  * main program logic follows:
 '''
 if __name__ == '__main__':
-    #initUART()
+    initUART()
     initMQTT()
     
     print ('Press Ctrl-C to quit.')
 
-    client.publish("python/test", 'ar')
     client.publish("python/test", '{"test": 34}')
 
     try:
         print(f"Server started")
         while ser.isOpen() : 
             if (ser.inWaiting() > 0): # if incoming bytes are waiting
-                print(readUARTMessage())
-                client.publish("python/test", readUARTMessage())
+                msg = readUARTMessage()
+                print(msg)
+                client.publish("python/test", msg)
     except (KeyboardInterrupt, SystemExit):
         client.disconnect()
         ser.close()
