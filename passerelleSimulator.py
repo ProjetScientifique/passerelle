@@ -14,7 +14,8 @@ import re
  * variables for script
 '''
 
-SERIALPORT      = "/dev/ttyACM0"
+#SERIALPORT      = "/dev/ttyACM0"
+SERIALPORT      = "COM3"
 BAUDRATE        = 115200
 
 ser = serial.Serial()
@@ -36,7 +37,7 @@ def initUART():
     ser.xonxoff = False                     # disable software flow control
     ser.rtscts = False                      # disable hardware (RTS/CTS) flow control
     ser.dsrdtr = False                      # disable hardware (DSR/DTR) flow control
-    
+
     try:
         ser.open()
         print("Starting Up Serial Monitor")
@@ -83,8 +84,9 @@ def formatData(arr):
  * send message to microcontroller with serial
 '''
 def sendUARTMessage(msg):
-    ser.write(msg.encode())
-    print(f"Message <{msg}> sent to micro-controller")
+    nb = ser.write(msg.encode())
+    print(nb)
+    #print(f"Message <{msg}> sent to micro-controller")
 
 '''
  * receive message from serial
@@ -119,6 +121,7 @@ if __name__ == '__main__':
                         if data != None :
                             if re.search("^ACK", data) :
                                 queueMessage.remove(msg)
+                                #print(f"Message <{msg}> removed from the queue")
                                 status = "ACK"
                         else :
                             sendUARTMessage(msg)
