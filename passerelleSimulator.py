@@ -14,8 +14,8 @@ import re
  * variables for script
 '''
 
-SERIALPORT      = "/dev/ttyACM0"
-#SERIALPORT      = "COM3"
+#SERIALPORT      = "/dev/ttyACM0"
+SERIALPORT      = "COM3"
 BAUDRATE        = 115200
 
 ser = serial.Serial()
@@ -64,17 +64,9 @@ def on_connect(client, userdata, flags, rc):
  * function on message for mqtt broker
 '''
 def on_message(client, userdata, msg):
-    arr = formatData(msg.payload.decode().split("\n")[:-1]) # Data received looks like : "{data1}\n{data2}...\n", so the received data is splitted on the "\n" char and the last entry is removed
+    arr = msg.payload.decode().split("\n")[:-1] # Data received looks like : "{data1}\n{data2}...\n", so the received data is splitted on the "\n" char and the last entry is removed
     for msgToSend in arr :
         queueMessage.append(msgToSend)
-
-'''
- * adds idFire key to json objects
-'''
-def formatData(arr):
-    for i in range (len(arr)) :
-        arr[i] += "|||" + str(calculateChecksum(arr[i])) # Add a checksum at the end of every message
-    return arr
 
 '''
  * calculate checksum for a given message
@@ -100,7 +92,7 @@ def calculateChecksum(message):
  * send message to microcontroller with serial
 '''
 def sendUARTMessage(msg):
-    ser.write(msg.encode())
+    ser.write((msg + "|||" + str(calculateChecksum(msg))).encode())
     print(f"Message <{msg}> sent to micro-controller")
 
 '''
