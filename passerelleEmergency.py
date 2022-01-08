@@ -33,7 +33,7 @@ def initMQTT():
 '''
 def on_connect(client, userdata, flags, rc):
   print("Connected with result code "+str(rc))
-
+  client.subscribe("python/test")
 
 '''
  * init serial mode
@@ -79,8 +79,6 @@ if __name__ == '__main__':
     initMQTT()
     
     print ('Press Ctrl-C to quit.')
-
-    client.publish("python/test", '{"test": 34}')
 
     try:
         print(f"Server started")

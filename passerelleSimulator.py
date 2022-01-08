@@ -64,7 +64,7 @@ def on_connect(client, userdata, flags, rc):
  * function on message for mqtt broker
 '''
 def on_message(client, userdata, msg):
-    arr = formatData(msg.payload.decode().split("\n")[:-1])
+    arr = formatData(msg.payload.decode().split("\n")[:-1]) # Data received looks like : "{data1}\n{data2}...\n", so the received data is splitted on the "\n" char and the last entry is removed
     for msgToSend in arr :
         queueMessage.append(msgToSend)
 
@@ -73,7 +73,7 @@ def on_message(client, userdata, msg):
 '''
 def formatData(arr):
     for i in range (len(arr)) :
-        arr[i] += "|||" + str(calculateChecksum(arr[i]))
+        arr[i] += "|||" + str(calculateChecksum(arr[i])) # Add a checksum at the end of every message
     return arr
 
 '''
@@ -107,7 +107,7 @@ def sendUARTMessage(msg):
  * receive message from serial
 '''
 def readUARTMessage():
-    msg = ser.readline()
+    msg = ser.readline() # The data needs to end with "\n", we should setup a timeout to take care of potential issues
     packet = msg.decode()
     return packet
 
@@ -122,17 +122,16 @@ if __name__ == '__main__':
     try:
         print(f"Server started")
         while ser.isOpen() : 
-            for msg in queueMessage :
-                sendUARTMessage(msg)
+            for msg in queueMessage : # Makes sure every message is sent one by one, and if something went wrong will resend the data. No timeouts made as of now
+                sendUARTMessage(msg) # Send msg and start a while loop as per to wait an ACK from the microbit
                 status = "NACK"
-                start = time.time()
+                start = time.time() # Start a timer to resend the data every 2 second if nothing is happening
                 while status == "NACK" :
                     if (time.time() - start) > 2 :
                         sendUARTMessage(msg)
                         start = time.time()
-                    elif (ser.inWaiting() > 0): # if incoming bytes are waiting
+                    elif (ser.inWaiting() > 0): # If incoming bytes are waiting
                         data = readUARTMessage()
-                        print(data)
                         if data != None :
                             if re.search("^ACK", data) :
                                 queueMessage.remove(msg)
